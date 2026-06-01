@@ -1,259 +1,152 @@
 <?php 
-require_once 'config.php';
+require_once '../config.php';
 
-// If not logged in redirect to login
-if(!isset($_SESSION['user_id'])){
+iif(!isset($_SESSION['admin_id'])){
     header("Location: login.php");
     exit();
 }
 
-// Get room id from URL
-if(!isset($_GET['room_id'])){
-    header("Location: rooms.php");
+// Confirm booking
+if(isset($_GET['confirm'])){
+    $id = $_GET['confirm'];
+    mysqli_query($conn, "UPDATE bookings SET status='confirmed' WHERE id='$id'");
+    header("Location: bookings.php?msg=confirmed");
     exit();
 }
 
-$room_id = $_GET['room_id'];
-
-// Get room details
-$room = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM rooms WHERE id='$room_id' AND status='available'"));
-
-if(!$room){
-    header("Location: rooms.php");
+// Cancel booking
+if(isset($_GET['cancel'])){
+    $id = $_GET['cancel'];
+    mysqli_query($conn, "UPDATE bookings SET status='cancelled' WHERE id='$id'");
+    header("Location: bookings.php?msg=cancelled");
     exit();
 }
 
-$error = "";
-$success = "";
-
-if($_SERVER['REQUEST_METHOD'] == 'POST'){
-    $check_in = $_POST['check_in'];
-    $check_out = $_POST['check_out'];
-    $guests = $_POST['guests'];
-    $user_id = $_SESSION['user_id'];
-
-    // Validate dates
-    if(empty($check_in) || empty($check_out)){
-        $error = "Please select check-in and check-out dates.";
-    } elseif($check_in >= $check_out){
-        $error = "Check-out date must be after check-in date.";
-    } elseif($check_in < date('Y-m-d')){
-        $error = "Check-in date cannot be in the past.";
-    } else {
-        // Calculate number of nights and total price
-        $nights = (strtotime($check_out) - strtotime($check_in)) / (60 * 60 * 24);
-        $total_price = $nights * $room['price'];
-
-        // Save booking
-        $sql = "INSERT INTO bookings (user_id, room_id, check_in, check_out, guests, total_price, status) 
-                VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$guests', '$total_price', 'pending')";
-
-        if(mysqli_query($conn, $sql)){
-            $booking_id = mysqli_insert_id($conn);
-            $success = "Booking successful!";
-        } else {
-            $error = "Something went wrong. Please try again.";
-        }
-    }
-}
+// Get all bookings
+$bookings = mysqli_query($conn, "
+    SELECT b.*, u.name as user_name, u.email, u.phone, r.room_number, r.room_type 
+    FROM bookings b 
+    JOIN users u ON b.user_id = u.id 
+    JOIN rooms r ON b.room_id = r.id 
+    ORDER BY b.created_at DESC
+");
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Room - Kaka Grand Hotel</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Manage Bookings - Admin</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
-<body>
+<body class="admin-body">
 
-    <!-- NAVIGATION -->
-    <nav class="navbar">
+    <!-- SIDEBAR -->
+    <div class="admin-sidebar">
         <div class="logo">
-    <img src="images/logo.svg" alt="Kaka Grand Hotel" height="45">
+    <img src="../images/logo.svg" alt="Kaka Grand Hotel" height="45">
 </div>
-        <ul class="nav-links">
-            <li><a href="index.php">Home</a></li>
-            <li><a href="rooms.php">Rooms</a></li>
-            <li><a href="dashboard.php">My Bookings</a></li>
-            <li><a href="logout.php" class="btn-nav">Logout</a></li>
-        </ul>
-    </nav>
+        <nav class="sidebar-nav">
+            <a href="index.php">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+            <a href="bookings.php" class="active">
+                <i class="fas fa-calendar-check"></i> Bookings
+            </a>
+            <a href="rooms.php">
+                <i class="fas fa-bed"></i> Rooms
+            </a>
+            <a href="users.php">
+                <i class="fas fa-users"></i> Users
+            </a>
+            <a href="../index.php" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Website
+            </a>
+            <a href="logout.php" class="logout-link">
+    <i class="fas fa-sign-out-alt"></i> Logout
+</a>
+        </nav>
+    </div>
 
-    <!-- PAGE HEADER -->
-    <section class="page-header">
-        <h1>Book Your Room</h1>
-        <p>Complete your reservation for Room <?php echo $room['room_number']; ?></p>
-    </section>
-
-    <section class="booking-section">
-
-        <?php if($success): ?>
-            <!-- SUCCESS MESSAGE -->
-            <div class="booking-success">
-                <i class="fas fa-check-circle"></i>
-                <h2>Booking Confirmed! 🎉</h2>
-                <p>Your reservation has been received successfully.</p>
-                <div class="success-details">
-                    <div class="success-item">
-                        <span>Room</span>
-                        <strong>Room <?php echo $room['room_number']; ?> — <?php echo $room['room_type']; ?></strong>
-                    </div>
-                    <div class="success-item">
-                        <span>Check In</span>
-                        <strong><?php echo date('D, d M Y', strtotime($_POST['check_in'])); ?></strong>
-                    </div>
-                    <div class="success-item">
-                        <span>Check Out</span>
-                        <strong><?php echo date('D, d M Y', strtotime($_POST['check_out'])); ?></strong>
-                    </div>
-                    <div class="success-item">
-                        <span>Guests</span>
-                        <strong><?php echo $_POST['guests']; ?> Guest(s)</strong>
-                    </div>
-                    <div class="success-item">
-                        <span>Total Price</span>
-                        <strong class="total-price">KSh <?php 
-                            $nights = (strtotime($_POST['check_out']) - strtotime($_POST['check_in'])) / (60 * 60 * 24);
-                            echo number_format($nights * $room['price'], 0); 
-                        ?></strong>
-                    </div>
-                    <div class="success-item">
-                        <span>Status</span>
-                        <strong><span class="status-badge pending">Pending Confirmation</span></strong>
-                    </div>
-                </div>
-                <div class="success-actions">
-                    <a href="dashboard.php" class="btn-auth">View My Bookings</a>
-                    <a href="rooms.php" class="btn-about">Book Another Room</a>
-                </div>
+    <!-- CONTENT -->
+    <div class="admin-content">
+        <div class="admin-topbar">
+            <h1>Manage Bookings</h1>
+            <div class="admin-user">
+                <i class="fas fa-user-circle"></i>
+                <span><?php echo $_SESSION['admin_name']; ?></span>
             </div>
+        </div>
 
-        <?php else: ?>
-            <div class="booking-grid">
-
-                <!-- ROOM SUMMARY -->
-                <div class="room-summary">
-                    <h2>Room Summary</h2>
-                    <div class="summary-image">
-                        <i class="fas fa-bed"></i>
-                        <span class="room-badge"><?php echo $room['room_type']; ?></span>
-                    </div>
-                    <div class="summary-details">
-                        <h3>Room <?php echo $room['room_number']; ?> — <?php echo $room['room_type']; ?></h3>
-                        <p><?php echo $room['description']; ?></p>
-                        <div class="room-amenities">
-                            <span><i class="fas fa-wifi"></i> WiFi</span>
-                            <span><i class="fas fa-tv"></i> TV</span>
-                            <span><i class="fas fa-snowflake"></i> AC</span>
-                            <span><i class="fas fa-coffee"></i> Breakfast</span>
-                        </div>
-                        <div class="summary-price">
-                            <span class="price">KSh <?php echo number_format($room['price'], 0); ?></span>
-                            <span class="per-night">/ night</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- BOOKING FORM -->
-                <div class="booking-form-card">
-                    <h2>Booking Details</h2>
-
-                    <?php if($error): ?>
-                        <div class="alert alert-error">
-                            <i class="fas fa-exclamation-circle"></i> <?php echo $error; ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <form method="POST" action="" id="booking-form">
-                        <div class="form-group">
-                            <label><i class="fas fa-user"></i> Full Name</label>
-                            <input type="text" value="<?php echo $_SESSION['user_name']; ?>" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-envelope"></i> Email</label>
-                            <input type="text" value="<?php echo $_SESSION['user_email']; ?>" disabled>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar"></i> Check-In Date</label>
-                            <input type="date" name="check_in" id="check_in" min="<?php echo date('Y-m-d'); ?>" required>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar"></i> Check-Out Date</label>
-                            <input type="date" name="check_out" id="check_out" min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>" required>
-                        </div>
-                        <div class="form-group">
-                            <label><i class="fas fa-users"></i> Number of Guests</label>
-                            <select name="guests" required>
-                                <option value="1">1 Guest</option>
-                                <option value="2">2 Guests</option>
-                                <option value="3">3 Guests</option>
-                                <option value="4">4 Guests</option>
-                            </select>
-                        </div>
-
-                        <!-- PRICE CALCULATOR -->
-                        <div class="price-calculator">
-                            <div class="calc-row">
-                                <span>Room Price</span>
-                                <span>KSh <?php echo number_format($room['price'], 0); ?> / night</span>
-                            </div>
-                            <div class="calc-row">
-                                <span>Number of Nights</span>
-                                <span id="nights-count">0 nights</span>
-                            </div>
-                            <div class="calc-row total">
-                                <span>Total Price</span>
-                                <span id="total-price">KSh 0</span>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn-auth">
-                            <i class="fas fa-check"></i> Confirm Booking
-                        </button>
-                    </form>
-                </div>
-
+        <?php if(isset($_GET['msg'])): ?>
+            <div class="alert <?php echo $_GET['msg'] == 'confirmed' ? 'alert-success' : 'alert-error'; ?>">
+                <i class="fas fa-check-circle"></i>
+                Booking <?php echo $_GET['msg']; ?> successfully!
             </div>
         <?php endif; ?>
 
-    </section>
-
-    <!-- FOOTER -->
-    <footer>
-        <p>&copy; 2026 Kaka Grand Hotel. Built by Steve Macharia.</p>
-    </footer>
-
-    <!-- JAVASCRIPT for price calculator -->
-    <script>
-        const checkIn = document.getElementById('check_in');
-        const checkOut = document.getElementById('check_out');
-        const nightsCount = document.getElementById('nights-count');
-        const totalPrice = document.getElementById('total-price');
-        const roomPrice = <?php echo $room['price']; ?>;
-
-        function calculatePrice(){
-            if(checkIn.value && checkOut.value){
-                const start = new Date(checkIn.value);
-                const end = new Date(checkOut.value);
-                const nights = (end - start) / (1000 * 60 * 60 * 24);
-
-                if(nights > 0){
-                    const total = nights * roomPrice;
-                    nightsCount.textContent = nights + ' night(s)';
-                    totalPrice.textContent = 'KSh ' + total.toLocaleString();
-                    totalPrice.style.color = '#f0a500';
-                } else {
-                    nightsCount.textContent = '0 nights';
-                    totalPrice.textContent = 'KSh 0';
-                }
-            }
-        }
-
-        checkIn.addEventListener('change', calculatePrice);
-        checkOut.addEventListener('change', calculatePrice);
-    </script>
-
+        <div class="admin-card">
+            <div class="admin-card-header">
+                <h2><i class="fas fa-calendar-check"></i> All Bookings</h2>
+            </div>
+            <div class="table-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Guest</th>
+                            <th>Phone</th>
+                            <th>Room</th>
+                            <th>Check In</th>
+                            <th>Check Out</th>
+                            <th>Guests</th>
+                            <th>Total</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php $i = 1; while($b = mysqli_fetch_assoc($bookings)): ?>
+                        <tr>
+                            <td><?php echo $i++; ?></td>
+                            <td>
+                                <strong><?php echo $b['user_name']; ?></strong><br>
+                                <small><?php echo $b['email']; ?></small>
+                            </td>
+                            <td><?php echo $b['phone'] ?? 'N/A'; ?></td>
+                            <td>Room <?php echo $b['room_number']; ?><br>
+                                <small><?php echo $b['room_type']; ?></small>
+                            </td>
+                            <td><?php echo $b['check_in']; ?></td>
+                            <td><?php echo $b['check_out']; ?></td>
+                            <td><?php echo $b['guests']; ?></td>
+                            <td>KSh <?php echo number_format($b['total_price'], 0); ?></td>
+                            <td>
+                                <span class="status-badge <?php echo $b['status']; ?>">
+                                    <?php echo ucfirst($b['status']); ?>
+                                </span>
+                            </td>
+                            <td class="action-btns">
+                                <?php if($b['status'] == 'pending'): ?>
+                                    <a href="?confirm=<?php echo $b['id']; ?>" class="btn-confirm">
+                                        <i class="fas fa-check"></i> Confirm
+                                    </a>
+                                    <a href="?cancel=<?php echo $b['id']; ?>" class="btn-cancel"
+                                       onclick="return confirm('Cancel this booking?')">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                <?php else: ?>
+                                    <span class="text-muted">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
