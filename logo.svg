@@ -1,0 +1,27 @@
+<svg width="220" height="50" viewBox="0 0 220 50" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- hotel icon -->
+  <rect x="2" y="18" width="36" height="28" rx="2" fill="none" stroke="#f0a500" stroke-width="1.5"/>
+  <rect x="10" y="10" width="20" height="36" rx="2" fill="none" stroke="#f0a500" stroke-width="1.5"/>
+
+  <!-- crown on top -->
+  <polyline points="10,10 14,4 18,9 22,2 26,9 30,4 34,10" fill="none" stroke="#f0a500" stroke-width="1.5" stroke-linejoin="round"/>
+
+  <!-- windows -->
+  <rect x="13" y="18" width="6" height="7" rx="1" fill="#f0a500" opacity="0.9"/>
+  <rect x="23" y="18" width="6" height="7" rx="1" fill="#f0a500" opacity="0.9"/>
+
+  <!-- door -->
+  <rect x="17" y="32" width="8" height="14" rx="1" fill="#f0a500"/>
+
+  <!-- divider line -->
+  <line x1="46" y1="8" x2="46" y2="42" stroke="#f0a500" stroke-width="1" opacity="0.5"/>
+
+  <!-- hotel name text -->
+  <text x="56" y="24" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#f0a500" letter-spacing="3">KAKA</text>
+  <text x="57" y="38" font-family="Georgia, serif" font-size="9" fill="#f0a500" letter-spacing="4" opacity="0.85">GRAND HOTEL</text>
+
+  <!-- five stars -->
+  <text x="57" y="48" font-family="Arial" font-size="7" fill="#f0a500" letter-spacing="2" opacity="0.7">★ ★ ★ ★ ★</text>
+
+</svg>
